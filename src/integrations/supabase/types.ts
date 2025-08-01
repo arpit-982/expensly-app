@@ -14,7 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ledger_files: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: number
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
