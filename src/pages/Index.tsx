@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   const [content, setContent] = useState("");
@@ -47,7 +48,14 @@ const Index = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">Ledger File Upload</h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold">Ledger File Upload</h1>
+            <Link to="/ledger">
+              <Button variant="outline">
+                Open Ledger Manager
+              </Button>
+            </Link>
+          </div>
           <p className="text-muted-foreground">Paste your .ledger file content below</p>
         </div>
         
