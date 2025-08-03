@@ -1,8 +1,11 @@
 import { AgGridReact } from 'ag-grid-react';
-import { ColDef, ICellRendererParams } from 'ag-grid-community';
+import { ColDef, ICellRendererParams, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { Badge } from '@/components/ui/badge';
+
+// Register AG Grid modules
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 interface TransactionRow {
   id: string;
