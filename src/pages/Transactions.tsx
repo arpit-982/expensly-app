@@ -4,11 +4,17 @@ import { parseMultipleEntries } from "@/lib/ledgerParser";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, FileText } from "lucide-react";
+import { Calendar, FileText, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import { ViewToggle } from "@/components/transactions/ViewToggle";
 import { TransactionRow } from "@/data/sampleTransactions";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { useFilter } from "@/contexts/FilterContext";
+import { filterTransactions } from "@/lib/filterEngine";
+import { FilterBuilder } from "@/components/filters/FilterBuilder";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Posting {
   account: string;
@@ -39,6 +45,8 @@ const Transactions = () => {
   const [selectedFileId, setSelectedFileId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { formatCurrency } = useCurrency();
+  const { filterConfig, hasActiveFilters } = useFilter();
 
   useEffect(() => {
     fetchLedgerFiles();
@@ -134,9 +142,9 @@ const Transactions = () => {
   };
 
   const formatAmount = (amount: number, currency: string | null) => {
-    const formatted = Math.abs(amount).toLocaleString();
+    const formatted = formatCurrency(amount);
     const sign = amount >= 0 ? "+" : "-";
-    return `${sign}${formatted}${currency || ""}`;
+    return `${sign}${formatted.replace(/^[^\d-]/, '')}`;
   };
 
   const getAmountColor = (amount: number) => {
@@ -160,6 +168,10 @@ const Transactions = () => {
   }
 
   const tableData = transformToTableData(transactions);
+  
+  // Apply filters to transactions
+  const filteredTransactions = filterTransactions(transactions, filterConfig);
+  const filteredTableData = transformToTableData(filteredTransactions);
 
   return (
     <div className="p-6 space-y-6">
@@ -171,16 +183,42 @@ const Transactions = () => {
             Transactions
           </h1>
           {!loading && (
-            <Badge variant="outline" className="text-sm">
-              {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-sm">
+                {filteredTransactions.length} of {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+              </Badge>
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="text-sm">
+                  Filtered
+                </Badge>
+              )}
+            </div>
           )}
         </div>
         
-        <ViewToggle 
-          viewMode={viewMode} 
-          onViewModeChange={setViewMode}
-        />
+        <div className="flex items-center gap-2">
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filters
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {filterConfig.groups.reduce((total, group) => total + group.conditions.length, 0)}
+                  </Badge>
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <FilterBuilder />
+            </CollapsibleContent>
+          </Collapsible>
+          
+          <ViewToggle 
+            viewMode={viewMode} 
+            onViewModeChange={setViewMode}
+          />
+        </div>
       </div>
 
       {/* Content */}
@@ -199,10 +237,10 @@ const Transactions = () => {
       ) : (
         <div className="h-[calc(100vh-200px)]">
           {viewMode === 'table' ? (
-            <TransactionsTable transactions={tableData} />
+            <TransactionsTable transactions={filteredTableData} />
           ) : (
             <div className="space-y-4 h-full overflow-auto">
-              {transactions.map((transaction, index) => (
+              {filteredTransactions.map((transaction, index) => (
                 <Card key={index} className="transition-all hover:shadow-md">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">

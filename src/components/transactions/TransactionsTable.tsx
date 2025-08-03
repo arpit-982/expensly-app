@@ -1,8 +1,8 @@
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { Badge } from '@/components/ui/badge';
+import { useTheme } from 'next-themes';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -21,14 +21,15 @@ interface TransactionsTableProps {
   transactions: TransactionRow[];
 }
 
-// Amount cell renderer with color coding
+// Amount cell renderer with color coding and currency formatting
 const AmountRenderer = ({ value }: ICellRendererParams) => {
+  const { formatCurrency } = useCurrency();
   const isNegative = value < 0;
   const colorClass = isNegative ? 'text-destructive' : 'text-emerald-600';
   
   return (
     <span className={`font-medium ${colorClass}`}>
-      ${Math.abs(value).toFixed(2)}
+      {formatCurrency(value)}
     </span>
   );
 };
@@ -64,6 +65,9 @@ const TagsRenderer = ({ value }: ICellRendererParams) => {
 };
 
 export function TransactionsTable({ transactions }: TransactionsTableProps) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   const columnDefs: ColDef[] = [
     {
       headerName: 'Date',
@@ -119,7 +123,23 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
   };
 
   return (
-    <div className="ag-theme-alpine h-full w-full">
+    <div 
+      className="h-full w-full"
+      data-ag-theme-mode={isDark ? 'dark' : 'light'}
+      style={{
+        '--ag-background-color': isDark ? 'hsl(var(--background))' : 'hsl(var(--background))',
+        '--ag-foreground-color': isDark ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))',
+        '--ag-header-background-color': isDark ? 'hsl(var(--card))' : 'hsl(var(--card))',
+        '--ag-header-foreground-color': isDark ? 'hsl(var(--card-foreground))' : 'hsl(var(--card-foreground))',
+        '--ag-border-color': isDark ? 'hsl(var(--border))' : 'hsl(var(--border))',
+        '--ag-row-hover-color': isDark ? 'hsl(var(--accent))' : 'hsl(var(--accent))',
+        '--ag-selected-row-background-color': isDark ? 'hsl(var(--accent))' : 'hsl(var(--accent))',
+        '--ag-font-family': 'inherit',
+        '--ag-font-size': '14px',
+        '--ag-grid-size': '6px',
+        '--ag-list-item-height': '40px',
+      } as React.CSSProperties}
+    >
       <AgGridReact
         rowData={transactions}
         columnDefs={columnDefs}
