@@ -170,3 +170,30 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+export interface Posting {
+  account: string;
+  amount: number;
+  currency: string | null;
+}
+
+export interface Transaction {
+  id: string;
+  date: string;
+  narration: string;
+  amount: number;
+  tags?: string[];
+  comments?: string[];
+  postings: Posting[]; // Preferred — contains both debit and credit info
+  debitAccounts: string[];
+  creditAccounts: string[];
+}
+
+export interface LedgerFile {
+  id: number;
+  name: string;
+  content: string;
+  is_primary: boolean;
+  last_updated_at: string;
+  created_at: string | null;
+}

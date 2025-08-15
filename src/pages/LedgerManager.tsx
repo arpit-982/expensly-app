@@ -9,15 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, Save, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import { AddFileModal } from '@/components/ledger/AddFileModal';
 import { LedgerEditor } from '@/components/ledger/LedgerEditor';
-
-interface LedgerFile {
-  id: number;
-  name: string;
-  content: string;
-  is_primary: boolean;
-  last_updated_at: string;
-  created_at: string | null;
-}
+import type { LedgerFile } from '@/lib/types';
 
 export default function LedgerManager() {
   const [files, setFiles] = useState<LedgerFile[]>([]);

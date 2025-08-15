@@ -87,10 +87,11 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     },
     {
       headerName: 'Debit Accounts',
-      field: 'debitAccounts',
-      cellRenderer: AccountsRenderer,
-      flex: 1,
-      autoHeight: true,
+        field: 'postings',
+  // Dynamically computes debits from postings using helper
+  valueGetter: ({ data }) => splitPostings(data.postings).debitAccounts.join(' ; '),
+  sortable: true,
+  filter: true,
     },
     {
       headerName: 'Credit Accounts',

@@ -15,28 +15,9 @@ import { filterTransactions } from "@/lib/filterEngine";
 import { FilterBuilder } from "@/components/filters/FilterBuilder";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-
-interface Posting {
-  account: string;
-  amount: number;
-  currency: string | null;
-}
-
-interface Transaction {
-  date: string;
-  payee: string;
-  comments: string[];
-  postings: Posting[];
-}
-
-interface LedgerFile {
-  id: number;
-  name: string;
-  content: string;
-  is_primary: boolean;
-  created_at: string;
-  last_updated_at: string;
-}
+import type { Transaction } from '@/lib/types';
+import type { Posting } from '@/lib/types';
+import type { LedgerFile } from '@/lib/types';
 
 const Transactions = () => {
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');

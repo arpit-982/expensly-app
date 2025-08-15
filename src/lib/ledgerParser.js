@@ -29,6 +29,9 @@
  * const parsed = parseEntry(entry);
  * // parsed.postings = [ {account: 'Expenses...'}, {account: 'Liabilities...'}, {account: 'Assets...', amount: -466} ]
  */
+
+import { splitPostings } from './utils';
+
 export function parseEntry(text) {
   // 1) Split the raw block into trimmed lines and remove leading whitespace
   const lines = text
@@ -45,10 +48,10 @@ export function parseEntry(text) {
   const headerRegex = /^(\d{4}[\/\-]\d{2}[\/\-]\d{2})\s+(.+)$/;
   const headerMatch = lines[0].match(headerRegex);
   if (!headerMatch) {
-    throw new Error('Invalid entry header format: ' + lines[0]);
+    throw new Error('Invalid header line in entry');
   }
   const date = headerMatch[1];          // e.g. '2025-01-10'
-  const payee = headerMatch[2];         // e.g. 'Groceries'
+  const narration = headerMatch[2];     // e.g. 'Groceries'
 
   // 3) Collect comment lines (lines starting with ';')
   const comments = lines
@@ -102,23 +105,39 @@ export function parseEntry(text) {
  * @returns {Array} Array of parsed transaction objects
  */
 export function parseMultipleEntries(content) {
+  console.log('📦 Raw ledger content:', JSON.stringify(content));
   if (!content || !content.trim()) {
+     console.warn('⚠️ Ledger content is empty or undefined.');
     return [];
   }
 
   // Split content by double newlines to separate transaction blocks
   const blocks = content.split(/\n\s*\n/).filter(block => block.trim());
-  
+
   const transactions = [];
-  for (const block of blocks) {
+  for (const [i, block] of blocks.entries()) {
     try {
       const parsed = parseEntry(block);
-      transactions.push(parsed);
+      const { debitAccounts, creditAccounts } = splitPostings(parsed.postings);
+
+      // Calculate total amount (sum of postings)
+      const amount = parsed.postings.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      transactions.push({
+        id: `${parsed.date}-${i}`,
+        date: parsed.date,
+        narration: parsed.narration, // use narration, not payee
+        amount,
+        tags: [],
+        comments: parsed.comments || [],
+        postings: parsed.postings,
+        debitAccounts,
+        creditAccounts,
+      });
     } catch (error) {
       console.warn('Failed to parse transaction block:', error.message);
-      // Continue parsing other blocks even if one fails
     }
   }
-
+  console.log('Parsed Transactions:', transactions);
   return transactions;
 }

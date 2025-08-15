@@ -1,5 +1,9 @@
+import type { Transaction } from '@/lib/types';
+import type { Posting } from '@/lib/types';
+import type { LedgerFile } from '@/lib/types';
+
 export interface FilterCondition {
-  field: 'date' | 'amount' | 'narration' | 'debitAccounts' | 'creditAccounts' | 'tags';
+  field: 'date' | 'amount' | 'narration' | 'postings' | 'tags';
   operator: 'equals' | 'contains' | 'starts_with' | 'ends_with' | 'greater_than' | 'less_than' | 'between' | 'before' | 'after' | 'on' | 'has' | 'has_not' | 'contains_all' | 'contains_any';
   value: any;
   value2?: any; // for 'between' operations
@@ -14,16 +18,6 @@ export interface FilterGroup {
 export interface FilterConfig {
   groups: FilterGroup[];
   groupLogic: 'AND' | 'OR';
-}
-
-export interface Transaction {
-  id: string;
-  date: string;
-  narration: string;
-  debitAccounts: string[];
-  creditAccounts: string[];
-  amount: number;
-  tags: string[];
 }
 
 // Field configurations for UI
@@ -43,15 +37,10 @@ export const filterFields = {
     operators: ['equals', 'contains', 'starts_with', 'ends_with'] as const,
     inputType: 'text' as const,
   },
-  debitAccounts: {
-    label: 'Debit Accounts',
+  postings: { // replaces separate debit/credit account fields
+    label: 'Postings',
     operators: ['has', 'has_not', 'contains_all', 'contains_any'] as const,
-    inputType: 'multiSelect' as const,
-  },
-  creditAccounts: {
-    label: 'Credit Accounts',
-    operators: ['has', 'has_not', 'contains_all', 'contains_any'] as const,
-    inputType: 'multiSelect' as const,
+    inputType: 'multiSelect' as const, // or a custom component
   },
   tags: {
     label: 'Tags',
@@ -145,10 +134,8 @@ function getFieldValue(transaction: Transaction, field: string): any {
       return transaction.amount;
     case 'narration':
       return transaction.narration;
-    case 'debitAccounts':
-      return transaction.debitAccounts;
-    case 'creditAccounts':
-      return transaction.creditAccounts;
+    case 'postings':
+      return transaction.postings.map(p => p.account);
     case 'tags':
       return transaction.tags;
     default:
@@ -179,4 +166,4 @@ export function createEmptyFilterConfig(): FilterConfig {
     groups: [createFilterGroup()],
     groupLogic: 'AND',
   };
-} 
+}
