@@ -1,169 +1,230 @@
-import type { Transaction } from '@/lib/types';
-import type { Posting } from '@/lib/types';
-import type { LedgerFile } from '@/lib/types';
+// src/lib/filterEngine.ts
+// A structured filter engine for Transaction[].
+// Replaces the simple FilterConfig with a more powerful system
+// of nested filter groups and conditions.
+import type { Transaction, Posting } from '@/types/ledger';
+import type { FilterField, FilterCondition, FilterGroup, FilterNode } from '@/types/filters';
+import type { FilterField, FilterCondition, FilterGroup, FilterNode } from '@/types/filters';
 
-export interface FilterCondition {
-  field: 'date' | 'amount' | 'narration' | 'postings' | 'tags';
-  operator: 'equals' | 'contains' | 'starts_with' | 'ends_with' | 'greater_than' | 'less_than' | 'between' | 'before' | 'after' | 'on' | 'has' | 'has_not' | 'contains_all' | 'contains_any';
-  value: any;
-  value2?: any; // for 'between' operations
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// --- Helper Functions ---
+function norm(s: string): string {
+  return s.normalize('NFKC').toLowerCase();
 }
 
-export interface FilterGroup {
-  id: string;
-  logic: 'AND' | 'OR';
-  conditions: FilterCondition[];
+function toISODate(d: string): string {
+  // Accepts YYYY-MM-DD or anything Date can parse; outputs YYYY-MM-DD.
+  // Note: `new Date('YYYY-MM-DD')` is parsed as UTC midnight. This function
+  // relies on this consistent behavior for date-only string comparisons.
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return '';
+  return dt.toISOString().slice(0, 10);
+}
+function accountsFromPostings(tx: Transaction): string[] {
+  return (tx.postings ?? []).map((p: Posting) => p.account);
 }
 
-export interface FilterConfig {
-  groups: FilterGroup[];
-  groupLogic: 'AND' | 'OR';
+// --- Evaluation Logic ---
+
+function checkCondition(tx: Transaction, cond: FilterCondition): boolean {
+  switch (cond.field) {
+    case 'date': {
+      const txDate = toISODate(tx.date);
+      const valDate = toISODate(cond.value);
+      if (!txDate || !valDate) return false;
+      switch (cond.operator) {
+        case 'is_on':
+          return txDate === valDate;
+        case 'is_not':
+          return txDate !== valDate;
+        case 'is_before':
+          return txDate < valDate;
+        case 'is_after':
+          return txDate > valDate;
+      }
+      break;
+    }
+
+    case 'amount': {
+      const txAmount = tx.amount;
+      const valAmount = parseFloat(String(cond.value));
+      if (Number.isNaN(valAmount)) return false;
+      switch (cond.operator) {
+        case 'is':
+          return txAmount === valAmount;
+        case 'is_not':
+          return txAmount !== valAmount;
+        case 'greater_than':
+          return txAmount > valAmount;
+        case 'less_than':
+          return txAmount < valAmount;
+      }
+      break;
+    }
+
+    case 'narration': {
+      const hay = norm(tx.narration ?? '');
+      const needle = norm(cond.value);
+      switch (cond.operator) {
+        case 'is':
+          return hay === needle;
+        case 'is_not':
+          return hay !== needle;
+        case 'contains':
+          return hay.includes(needle);
+        case 'does_not_contain':
+          return !hay.includes(needle);
+        case 'starts_with':
+          return hay.startsWith(needle);
+        case 'ends_with':
+          return hay.endsWith(needle);
+        case 'is_blank':
+          return hay.trim() === '';
+        case 'is_not_blank':
+          return hay.trim() !== '';
+      }
+      break;
+    }
+
+    case 'account': {
+      const accounts = accountsFromPostings(tx).map(norm);
+      const needle = norm(cond.value);
+      if (!needle) return false;
+      switch (cond.operator) {
+        case 'is':
+          return accounts.some((acc) => acc === needle);
+        case 'is_not':
+          return accounts.every((acc) => acc !== needle);
+        case 'contains':
+          return accounts.some((acc) => acc.includes(needle));
+        case 'does_not_contain':
+          return accounts.every((acc) => !acc.includes(needle));
+      }
+      break;
+    }
+
+    case 'tag': {
+      const tags = (tx.tags ?? []).map(norm);
+      const needle = norm(cond.value);
+      switch (cond.operator) {
+        case 'contains':
+          return needle ? tags.includes(needle) : false;
+        case 'does_not_contain':
+          return needle ? !tags.includes(needle) : true;
+        case 'is_blank':
+          return tags.length === 0;
+        case 'is_not_blank':
+          return tags.length > 0;
+      }
+      break;
+    }
+  }
+  return false;
 }
 
-// Field configurations for UI
-export const filterFields = {
-  date: {
-    label: 'Date',
-    operators: ['equals', 'before', 'after', 'between', 'on'] as const,
-    inputType: 'date' as const,
-  },
-  amount: {
-    label: 'Amount',
-    operators: ['equals', 'greater_than', 'less_than', 'between'] as const,
-    inputType: 'number' as const,
-  },
-  narration: {
-    label: 'Narration',
-    operators: ['equals', 'contains', 'starts_with', 'ends_with'] as const,
-    inputType: 'text' as const,
-  },
-  postings: { // replaces separate debit/credit account fields
-    label: 'Postings',
-    operators: ['has', 'has_not', 'contains_all', 'contains_any'] as const,
-    inputType: 'multiSelect' as const, // or a custom component
-  },
-  tags: {
-    label: 'Tags',
-    operators: ['has', 'has_not', 'contains_all', 'contains_any'] as const,
-    inputType: 'multiSelect' as const,
-  },
-};
+function evaluateNode(tx: Transaction, node: FilterNode): boolean {
+  // Type guard to distinguish between FilterCondition and FilterGroup
+  if ('field' in node) {
+    return checkCondition(tx, node);
+  }
 
-// Core filter evaluation functions
-export function filterTransactions(transactions: Transaction[], config: FilterConfig): Transaction[] {
-  if (config.groups.length === 0) return transactions;
-  
-  return transactions.filter(transaction => evaluateFilterConfig(transaction, config));
-}
+  // It's a FilterGroup
+  const group = node;
+  if (group.children.length === 0) {
+    return true; // An empty group doesn't filter anything out
+  }
 
-function evaluateFilterConfig(transaction: Transaction, config: FilterConfig): boolean {
-  const groupResults = config.groups.map(group => evaluateGroup(transaction, group));
-  
-  return config.groupLogic === 'AND' 
-    ? groupResults.every(result => result)
-    : groupResults.some(result => result);
-}
-
-function evaluateGroup(transaction: Transaction, group: FilterGroup): boolean {
-  if (group.conditions.length === 0) return true;
-  
-  const conditionResults = group.conditions.map(condition => 
-    evaluateCondition(transaction, condition)
-  );
-  
-  return group.logic === 'AND'
-    ? conditionResults.every(result => result)
-    : conditionResults.some(result => result);
-}
-
-function evaluateCondition(transaction: Transaction, condition: FilterCondition): boolean {
-  const fieldValue = getFieldValue(transaction, condition.field);
-  
-  switch (condition.operator) {
-    // Date operators
-    case 'equals':
-      return new Date(fieldValue).getTime() === new Date(condition.value).getTime();
-    case 'before':
-      return new Date(fieldValue) < new Date(condition.value);
-    case 'after':
-      return new Date(fieldValue) > new Date(condition.value);
-    case 'between':
-      return new Date(fieldValue) >= new Date(condition.value) && 
-             new Date(fieldValue) <= new Date(condition.value2);
-    case 'on':
-      return new Date(fieldValue).toDateString() === new Date(condition.value).toDateString();
-    
-    // Number operators
-    case 'greater_than':
-      return fieldValue > condition.value;
-    case 'less_than':
-      return fieldValue < condition.value;
-    
-    // Text operators
-    case 'contains':
-      return fieldValue.toLowerCase().includes(condition.value.toLowerCase());
-    case 'starts_with':
-      return fieldValue.toLowerCase().startsWith(condition.value.toLowerCase());
-    case 'ends_with':
-      return fieldValue.toLowerCase().endsWith(condition.value.toLowerCase());
-    
-    // Array operators
-    case 'has':
-      return Array.isArray(fieldValue) && fieldValue.includes(condition.value);
-    case 'has_not':
-      return Array.isArray(fieldValue) && !fieldValue.includes(condition.value);
-    case 'contains_all':
-      return Array.isArray(fieldValue) && 
-             Array.isArray(condition.value) &&
-             condition.value.every(item => fieldValue.includes(item));
-    case 'contains_any':
-      return Array.isArray(fieldValue) && 
-             Array.isArray(condition.value) &&
-             condition.value.some(item => fieldValue.includes(item));
-    
-    default:
-      return fieldValue === condition.value;
+  if (group.conjunction === 'and') {
+    return group.children.every((child) => evaluateNode(tx, child));
+  } else {
+    // 'or'
+    return group.children.some((child) => evaluateNode(tx, child));
   }
 }
+/**
+ * Returns a new array filtered by the provided filter group.
+ */
+export function filterTransactions(
+  transactions: Transaction[],
+  filter?: FilterGroup | null,
+): Transaction[] {
 
-function getFieldValue(transaction: Transaction, field: string): any {
+    return transactions ?? [;
+
+    return transactions ?? [;
+  }
+  return (transactions ?? []).filter((tx) => evaluateNode(tx, filter));
+}
+
+// --- Factory Functions ---
+
+export function createFilterCondition(field: FilterField = 'date'): FilterCondition {
+  const common = { id: crypto.randomUUID() };
   switch (field) {
     case 'date':
-      return transaction.date;
+      return { ...common, field, operator: 'is_on', value: new Date().toISOString().slice(0, 10) };
     case 'amount':
-      return transaction.amount;
+      return { ...common, field, operator: 'is', value: 0 };
     case 'narration':
-      return transaction.narration;
-    case 'postings':
-      return transaction.postings.map(p => p.account);
-    case 'tags':
-      return transaction.tags;
+    case 'account':
+    case 'tag':
+      return { ...common, field, operator: 'contains', value: '' };
     default:
-      return null;
+      // This exhaustiveness check ensures we handle all field types.
+      const _: never = field;
+      throw new Error(`Unknown field type: ${field}`);
   }
 }
 
-// Utility functions for filter management
 export function createFilterGroup(): FilterGroup {
   return {
     id: crypto.randomUUID(),
-    logic: 'AND',
-    conditions: [],
-  };
-}
+    conjunction: 'and',
+    children: [],
 
-export function createFilterCondition(field: FilterCondition['field']): FilterCondition {
-  const fieldConfig = filterFields[field];
-  return {
-    field,
-    operator: fieldConfig.operators[0],
-    value: field === 'date' ? new Date().toISOString().split('T')[0] : '',
-  };
-}
-
-export function createEmptyFilterConfig(): FilterConfig {
-  return {
-    groups: [createFilterGroup()],
-    groupLogic: 'AND',
-  };
-}

@@ -1,139 +1,171 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { 
-  FilterConfig, 
-  FilterGroup, 
-  FilterCondition, 
-  createFilterGroup, 
-  createFilterCondition, 
-  createEmptyFilterConfig 
-} from '@/lib/filterEngine';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { FilterGroup, FilterCondition, FilterNode, FilterField } from '@/types/filters';
+import { createFilterGroup, createFilterCondition } from '@/lib/filterEngine';
+
+// --- Recursive Helper Functions for Immutable Updates ---
+
+/**
+ * Recursively finds a node by its ID and applies an update function to it.
+ * Returns a new, updated tree.
+ */
+function updateNodeRecursive(
+  currentNode: FilterNode,
+  nodeId: string,
+  updateFn: (node: FilterNode) => FilterNode,
+): FilterNode {
+  if (currentNode.id === nodeId) {
+    return updateFn(currentNode);
+  }
+
+  if ('children' in currentNode) {
+    return {
+      ...currentNode,
+      children: currentNode.children.map((child) => updateNodeRecursive(child, nodeId, updateFn)),
+    };
+  }
+
+  return currentNode;
+}
+
+/**
+ * Recursively finds and removes a node by its ID.
+ * Returns a new, updated tree, or null if the node itself was removed.
+ */
+function removeNodeRecursive(currentNode: FilterNode, nodeIdToRemove: string): FilterNode | null {
+  if (currentNode.id === nodeIdToRemove) {
+    return null; // This node will be filtered out by the caller.
+  }
+
+  if ('children' in currentNode) {
+    return {
+      ...currentNode,
+      children: currentNode.children
+        .map((child) => removeNodeRecursive(child, nodeIdToRemove))
+        .filter((child): child is FilterNode => child !== null),
+    };
+  }
+
+  return currentNode;
+}
+
+/**
+ * Recursively checks if a filter tree contains any conditions.
+ */
+function hasConditionsRecursive(node: FilterNode): boolean {
+  if ('field' in node) {
+    return true; // It's a condition
+  }
+  if ('children' in node) {
+    return node.children.some(hasConditionsRecursive); // Check children
+  }
+
+  return false;
+}
+
+// --- React Context Definition ---
 
 interface FilterContextType {
-  filterConfig: FilterConfig;
-  setFilterConfig: (config: FilterConfig) => void;
-  addFilterGroup: () => void;
-  removeFilterGroup: (groupId: string) => void;
-  addCondition: (groupId: string, field?: FilterCondition['field']) => void;
-  removeCondition: (groupId: string, conditionIndex: number) => void;
-  updateCondition: (groupId: string, conditionIndex: number, condition: Partial<FilterCondition>) => void;
-  updateGroupLogic: (groupId: string, logic: 'AND' | 'OR') => void;
-  updateGroupLogic: (groupId: string, logic: 'AND' | 'OR') => void;
-  updateFilterGroupLogic: (logic: 'AND' | 'OR') => void;
-  clearAllFilters: () => void;
+  filter: FilterGroup;
+  setFilter: (filter: FilterGroup) => void;
+  addCondition: (groupId: string, field?: FilterField) => void;
+  addGroup: (groupId: string) => void;
+  removeNode: (nodeId: string) => void;
+  updateNode: (nodeId: string, updates: Partial<FilterNode>) => void;
+  changeConditionField: (conditionId: string, newField: FilterField) => void;
+  clearAll: () => void;
   hasActiveFilters: boolean;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export function FilterProvider({ children }: { children: ReactNode }) {
-  const [filterConfig, setFilterConfig] = useState<FilterConfig>(createEmptyFilterConfig());
+  const [filter, setFilter] = useState<FilterGroup>(createFilterGroup());
 
-  const addFilterGroup = () => {
-    setFilterConfig(prev => ({
-      ...prev,
-      groups: [...prev.groups, createFilterGroup()],
-    }));
-  };
+  const addCondition = useCallback((groupId: string, field: FilterField = 'date') => {
+    const newCondition = createFilterCondition(field);
+    const updater = (node: FilterNode) => {
+      if ('children' in node) {
+        return { ...node, children: [...node.children, newCondition] };
+      }
+      return node;
+    };
+    setFilter(
+      (currentFilter) => updateNodeRecursive(currentFilter, groupId, updater) as FilterGroup,
+    );
+  }, []);
 
-  const removeFilterGroup = (groupId: string) => {
-    setFilterConfig(prev => ({
-      ...prev,
-      groups: prev.groups.filter(group => group.id !== groupId),
-    }));
-  };
+  const addGroup = useCallback((groupId: string) => {
+    const newGroup = createFilterGroup();
+    const updater = (node: FilterNode) => {
+      if ('children' in node) {
+        return { ...node, children: [...node.children, newGroup] };
+      }
+      return node;
+    };
+    setFilter(
+      (currentFilter) => updateNodeRecursive(currentFilter, groupId, updater) as FilterGroup,
+    );
+  }, []);
 
-  const addCondition = (groupId: string, field?: FilterCondition['field']) => {
-    setFilterConfig(prev => ({
-      ...prev,
-      groups: prev.groups.map(group => {
-        if (group.id === groupId) {
-          const newCondition = field 
-            ? createFilterCondition(field)
-            : createFilterCondition('date');
-          return {
-            ...group,
-            conditions: [...group.conditions, newCondition],
-          };
-        }
-        return group;
-      }),
-    }));
-  };
+  const removeNode = useCallback((nodeId: string) => {
+    setFilter((currentFilter) => {
+      // Prevent removing the root node
+      if (currentFilter.id === nodeId) return currentFilter;
+      // The result should always be a FilterGroup as we don't remove the root
+      return removeNodeRecursive(currentFilter, nodeId) as FilterGroup;
+    });
+  }, []);
 
-  const removeCondition = (groupId: string, conditionIndex: number) => {
-    setFilterConfig(prev => ({
-      ...prev,
-      groups: prev.groups.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            conditions: group.conditions.filter((_, index) => index !== conditionIndex),
-          };
-        }
-        return group;
-      }),
-    }));
-  };
+  const updateNode = useCallback((nodeId: string, updates: Partial<FilterNode>) => {
+    const updater = (node: FilterNode): FilterNode => {
+      // Use a type guard to handle groups and conditions separately.
+      if ('children' in node) {
+        // This is a FilterGroup.
+        return { ...node, ...updates };
+      } else {
+        // This is a FilterCondition. We assert the type because we know from our UI
+        // logic that we are not changing the `field` here, only `operator` or `value`.
+        return { ...node, ...updates } as FilterCondition;
+      }
+    };
+    setFilter(
+      (currentFilter) => updateNodeRecursive(currentFilter, nodeId, updater) as FilterGroup,
+    );
+  }, []);
 
-  const updateCondition = (groupId: string, conditionIndex: number, updates: Partial<FilterCondition>) => {
-    setFilterConfig(prev => ({
-      ...prev,
-      groups: prev.groups.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            conditions: group.conditions.map((condition, index) => {
-              if (index === conditionIndex) {
-                return { ...condition, ...updates };
-              }
-              return condition;
-            }),
-          };
-        }
-        return group;
-      }),
-    }));
-  };
+  const changeConditionField = useCallback((conditionId: string, newField: FilterField) => {
+    const updater = (node: FilterNode) => {
+      // Type guard: Only perform the update if the node is a condition.
+      if ('field' in node) {
+        // Create a new default condition for the field, but preserve the original ID.
+        return { ...createFilterCondition(newField), id: node.id };
+      }
+      // If a group's ID was passed by mistake, do nothing.
+      return node;
+    };
+    setFilter(
+      (currentFilter) => updateNodeRecursive(currentFilter, conditionId, updater) as FilterGroup,
+    );
+  }, []);
 
-  const updateGroupLogic = (groupId: string, logic: 'AND' | 'OR') => {
-    setFilterConfig(prev => ({
-      ...prev,
-      groups: prev.groups.map(group => {
-        if (group.id === groupId) {
-          return { ...group, logic };
-        }
-        return group;
-      }),
-    }));
-  };
-
-  const updateFilterGroupLogic = (logic: 'AND' | 'OR') => {
-    setFilterConfig(prev => ({
-      ...prev,
-      groupLogic: logic,
-    }));
-  };
-
-  const clearAllFilters = () => {
-    setFilterConfig(createEmptyFilterConfig());
-  };
-
-  const hasActiveFilters = filterConfig.groups.some(group => group.conditions.length > 0);
-
+  const clearAll = useCallback(() => {
+    setFilter(createFilterGroup());
+  }, []);
+  const hasActiveFilters = hasConditionsRecursive(filter);
   return (
-    <FilterContext.Provider value={{
-      filterConfig,
-      setFilterConfig,
-      addFilterGroup,
-      removeFilterGroup,
-      addCondition,
-      removeCondition,
-      updateCondition,
-      updateGroupLogic,
-      updateFilterGroupLogic,
-      clearAllFilters,
-      hasActiveFilters,
-    }}>
+    <FilterContext.Provider
+      value={{
+        filter,
+        setFilter,
+        addCondition,
+        addGroup,
+        removeNode,
+        updateNode,
+        changeConditionField,
+        clearAll,
+        hasActiveFilters,
+      }}
+    >
       {children}
     </FilterContext.Provider>
   );
@@ -145,4 +177,4 @@ export function useFilter() {
     throw new Error('useFilter must be used within a FilterProvider');
   }
   return context;
-} 
+}

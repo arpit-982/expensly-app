@@ -3,22 +3,19 @@ import { ColDef, ICellRendererParams, ModuleRegistry, AllCommunityModule } from 
 import { Badge } from '@/components/ui/badge';
 import { useTheme } from 'next-themes';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import type { Transaction, Posting } from '@/types/ledger';
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-interface TransactionRow {
-  id: string;
-  date: string;
-  narration: string;
-  debitAccounts: string[];
-  creditAccounts: string[];
-  amount: number;
-  tags: string[];
+interface TransactionsTableProps {
+  transactions: Transaction[];
 }
 
-interface TransactionsTableProps {
-  transactions: TransactionRow[];
+function splitPostings(postings: Posting[] = []) {
+  const debitAccounts = postings.filter((p) => p.amount > 0).map((p) => p.account);
+  const creditAccounts = postings.filter((p) => p.amount < 0).map((p) => p.account);
+  return { debitAccounts, creditAccounts };
 }
 
 // Amount cell renderer with color coding and currency formatting
@@ -26,18 +23,14 @@ const AmountRenderer = ({ value }: ICellRendererParams) => {
   const { formatCurrency } = useCurrency();
   const isNegative = value < 0;
   const colorClass = isNegative ? 'text-destructive' : 'text-emerald-600';
-  
-  return (
-    <span className={`font-medium ${colorClass}`}>
-      {formatCurrency(value)}
-    </span>
-  );
+
+  return <span className={`font-medium ${colorClass}`}>{formatCurrency(value)}</span>;
 };
 
 // Accounts cell renderer
 const AccountsRenderer = ({ value }: ICellRendererParams) => {
   if (!value || value.length === 0) return <span className="text-muted-foreground">—</span>;
-  
+
   return (
     <div className="space-y-1">
       {value.map((account: string, index: number) => (
@@ -52,7 +45,7 @@ const AccountsRenderer = ({ value }: ICellRendererParams) => {
 // Tags cell renderer
 const TagsRenderer = ({ value }: ICellRendererParams) => {
   if (!value || value.length === 0) return <span className="text-muted-foreground">—</span>;
-  
+
   return (
     <div className="flex flex-wrap gap-1">
       {value.map((tag: string, index: number) => (
@@ -75,8 +68,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       sortable: true,
       filter: 'agDateColumnFilter',
       width: 120,
-      cellRenderer: ({ value }: ICellRendererParams) => 
-        new Date(value).toLocaleDateString()
+      cellRenderer: ({ value }: ICellRendererParams) => new Date(value).toLocaleDateString(),
     },
     {
       headerName: 'Narration',
@@ -87,15 +79,16 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     },
     {
       headerName: 'Debit Accounts',
-        field: 'postings',
-  // Dynamically computes debits from postings using helper
-  valueGetter: ({ data }) => splitPostings(data.postings).debitAccounts.join(' ; '),
-  sortable: true,
-  filter: true,
+      field: 'postings',
+      valueGetter: ({ data }) => splitPostings((data as Transaction).postings).debitAccounts,
+      cellRenderer: AccountsRenderer,
+      flex: 1,
+      autoHeight: true,
     },
     {
       headerName: 'Credit Accounts',
-      field: 'creditAccounts',
+      field: 'postings',
+      valueGetter: ({ data }) => splitPostings((data as Transaction).postings).creditAccounts,
       cellRenderer: AccountsRenderer,
       flex: 1,
       autoHeight: true,
@@ -124,22 +117,28 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
   };
 
   return (
-    <div 
+    <div
       className="h-full w-full"
       data-ag-theme-mode={isDark ? 'dark' : 'light'}
-      style={{
-        '--ag-background-color': isDark ? 'hsl(var(--background))' : 'hsl(var(--background))',
-        '--ag-foreground-color': isDark ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))',
-        '--ag-header-background-color': isDark ? 'hsl(var(--card))' : 'hsl(var(--card))',
-        '--ag-header-foreground-color': isDark ? 'hsl(var(--card-foreground))' : 'hsl(var(--card-foreground))',
-        '--ag-border-color': isDark ? 'hsl(var(--border))' : 'hsl(var(--border))',
-        '--ag-row-hover-color': isDark ? 'hsl(var(--accent))' : 'hsl(var(--accent))',
-        '--ag-selected-row-background-color': isDark ? 'hsl(var(--accent))' : 'hsl(var(--accent))',
-        '--ag-font-family': 'inherit',
-        '--ag-font-size': '14px',
-        '--ag-grid-size': '6px',
-        '--ag-list-item-height': '40px',
-      } as React.CSSProperties}
+      style={
+        {
+          '--ag-background-color': isDark ? 'hsl(var(--background))' : 'hsl(var(--background))',
+          '--ag-foreground-color': isDark ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))',
+          '--ag-header-background-color': isDark ? 'hsl(var(--card))' : 'hsl(var(--card))',
+          '--ag-header-foreground-color': isDark
+            ? 'hsl(var(--card-foreground))'
+            : 'hsl(var(--card-foreground))',
+          '--ag-border-color': isDark ? 'hsl(var(--border))' : 'hsl(var(--border))',
+          '--ag-row-hover-color': isDark ? 'hsl(var(--accent))' : 'hsl(var(--accent))',
+          '--ag-selected-row-background-color': isDark
+            ? 'hsl(var(--accent))'
+            : 'hsl(var(--accent))',
+          '--ag-font-family': 'inherit',
+          '--ag-font-size': '14px',
+          '--ag-grid-size': '6px',
+          '--ag-list-item-height': '40px',
+        } as React.CSSProperties
+      }
     >
       <AgGridReact
         rowData={transactions}
