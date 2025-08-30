@@ -115,7 +115,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       return removeNodeRecursive(currentFilter, nodeId) as FilterGroup;
     });
   }, []);
-
   const updateNode = useCallback((nodeId: string, updates: Partial<FilterNode>) => {
     const updater = (node: FilterNode): FilterNode => {
       // Use a type guard to handle groups and conditions separately.

@@ -4,54 +4,6 @@
 // of nested filter groups and conditions.
 import type { Transaction, Posting } from '@/types/ledger';
 import type { FilterField, FilterCondition, FilterGroup, FilterNode } from '@/types/filters';
-import type { FilterField, FilterCondition, FilterGroup, FilterNode } from '@/types/filters';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // --- Helper Functions ---
 function norm(s: string): string {
@@ -194,10 +146,8 @@ export function filterTransactions(
   transactions: Transaction[],
   filter?: FilterGroup | null,
 ): Transaction[] {
-
-    return transactions ?? [;
-
-    return transactions ?? [;
+  if (!filter) {
+    return transactions ?? [];
   }
   return (transactions ?? []).filter((tx) => evaluateNode(tx, filter));
 }
@@ -222,9 +172,8 @@ export function createFilterCondition(field: FilterField = 'date'): FilterCondit
   }
 }
 
-export function createFilterGroup(): FilterGroup {
-  return {
-    id: crypto.randomUUID(),
-    conjunction: 'and',
-    children: [],
-
+// export function createFilterGroup(): FilterGroup {
+//   return {
+//     id: crypto.randomUUID(),
+//     conjunction: 'and',
+//     children: [],

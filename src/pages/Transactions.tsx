@@ -8,7 +8,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useFilter } from '@/contexts/FilterContext';
 import type { TransactionRow } from '@/data/sampleTransactions';
 import { useToast } from '@/hooks/use-toast';
-import { ledgerService } from '@/services/ledgerServices';
+import { ledgerService } from '@/services/ledgerService';
 import type { Transaction, LedgerFile } from '@/types/ledger';
 import { filterTransactions } from '@/lib/filterEngine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
