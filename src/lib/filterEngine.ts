@@ -172,8 +172,10 @@ export function createFilterCondition(field: FilterField = 'date'): FilterCondit
   }
 }
 
-// export function createFilterGroup(): FilterGroup {
-//   return {
-//     id: crypto.randomUUID(),
-//     conjunction: 'and',
-//     children: [],
+export function createFilterGroup(): FilterGroup {
+  return {
+    id: 'root',
+    conjunction: 'and',
+    children: [],
+  };
+}

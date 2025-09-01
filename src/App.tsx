@@ -10,6 +10,7 @@ import { Layout } from "@/components/Layout";
 import Index from "./pages/Index";
 import LedgerManager from "./pages/LedgerManager";
 import Transactions from "./pages/Transactions";
+import ImportPage from "./pages/Import";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/ledger" element={<LedgerManager />} />
                   <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/import" element={<ImportPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

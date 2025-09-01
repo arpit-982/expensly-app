@@ -20,24 +20,24 @@ export function LedgerEditor({ value, onChange }: LedgerEditorProps) {
         root: [
           // Dates
           [/^\d{4}[-\/]\d{2}[-\/]\d{2}/, 'date'],
-          
+
           // Comments (lines starting with ;)
           [/^;.*$/, 'comment'],
           [/\s+;.*$/, 'comment'],
-          
+
           // Account names (indented lines)
           [/^\s+[A-Z][A-Za-z0-9:_\s-]+/, 'account'],
-          
+
           // Numbers (amounts)
           [/-?\d+\.?\d*/, 'number'],
-          
+
           // Transaction descriptions
           [/^\d{4}[-\/]\d{2}[-\/]\d{2}\s+.*/, 'transaction'],
-          
+
           // Include statements
           [/^include\s+/, 'keyword'],
-        ]
-      }
+        ],
+      },
     });
 
     // Define theme colors for dark mode
@@ -58,11 +58,19 @@ export function LedgerEditor({ value, onChange }: LedgerEditorProps) {
         'editorLineNumber.foreground': '#858585',
         'editor.selectionBackground': '#264f78',
         'editor.lineHighlightBackground': '#2a2d3a',
-      }
+      },
     });
 
     // Set the theme
     monaco.editor.setTheme('ledger-dark');
+
+    // Scroll to the last line by default
+    const model = editor.getModel();
+    if (model) {
+      const lineCount = model.getLineCount();
+      editor.revealLine(lineCount, 1); // 1 = AtBottom
+      editor.setPosition({ lineNumber: lineCount, column: model.getLineMaxColumn(lineCount) });
+    }
 
     // Configure editor options
     editor.updateOptions({
@@ -76,8 +84,8 @@ export function LedgerEditor({ value, onChange }: LedgerEditorProps) {
       insertSpaces: true,
       find: {
         addExtraSpaceOnTop: false,
-        autoFindInSelection: 'never'
-      }
+        autoFindInSelection: 'never',
+      },
     });
   };
 

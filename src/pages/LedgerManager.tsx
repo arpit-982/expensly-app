@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ledgerService } from '@/services/ledgerService';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, Save, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import { AddFileModal } from '@/components/ledger/AddFileModal';
 import { LedgerEditor } from '@/components/ledger/LedgerEditor';
-import type { LedgerFile } from '@/lib/types';
+import type { LedgerFile } from '@/types/ledger';
 
 export default function LedgerManager() {
   const [files, setFiles] = useState<LedgerFile[]>([]);
@@ -27,16 +27,9 @@ export default function LedgerManager() {
 
   const loadFiles = async () => {
     try {
-      const { data, error } = await (supabase as any)
-        .from('ledger_files')
-        .select('*')
-        .order('last_updated_at', { ascending: false });
+      const files = await ledgerService.getFiles();
+      setFiles(files);
 
-      if (error) throw error;
-
-      const files = data || [];
-      setFiles(files as LedgerFile[]);
-      
       // Auto-select primary file or first file
       const primaryFile = files.find((f: any) => f.is_primary) || files[0];
       if (primaryFile) {
@@ -45,9 +38,9 @@ export default function LedgerManager() {
       }
     } catch (error) {
       toast({
-        title: "Error loading files",
-        description: error instanceof Error ? error.message : "Failed to load ledger files",
-        variant: "destructive"
+        title: 'Error loading files',
+        description: error instanceof Error ? error.message : 'Failed to load ledger files',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -59,28 +52,30 @@ export default function LedgerManager() {
 
     setIsSaving(true);
     try {
-      const { error } = await (supabase as any)
-        .from('ledger_files')
-        .update({
-          content: editorContent,
-          last_updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedFile.id);
-
-      if (error) throw error;
-
+      // 1. Save the raw content
+      await ledgerService.saveFile({
+        id: selectedFile.id,
+        content: editorContent,
+      });
       toast({
-        title: "File saved",
-        description: `${selectedFile.name} has been saved successfully`
+        title: 'File content saved',
+        description: 'Now parsing file to update transactions...',
       });
 
-      // Refresh files to update last_updated_at
+      // 2. Trigger parsing and upserting of transactions
+      await ledgerService.parseAndUpsert(selectedFile.id);
+      toast({
+        title: 'File parsed successfully',
+        description: `${selectedFile.name} has been processed.`,
+      });
+
+      // 3. Refresh file list to show new `last_updated_at`
       await loadFiles();
     } catch (error) {
       toast({
-        title: "Error saving file",
-        description: error instanceof Error ? error.message : "Failed to save file",
-        variant: "destructive"
+        title: 'Error saving file',
+        description: error instanceof Error ? error.message : 'Failed to save file',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -91,16 +86,10 @@ export default function LedgerManager() {
     if (!confirm(`Are you sure you want to delete "${file.name}"?`)) return;
 
     try {
-      const { error } = await (supabase as any)
-        .from('ledger_files')
-        .delete()
-        .eq('id', file.id);
-
-      if (error) throw error;
-
+      await ledgerService.deleteFile(file.id);
       toast({
-        title: "File deleted",
-        description: `${file.name} has been deleted`
+        title: 'File deleted',
+        description: `${file.name} has been deleted`,
       });
 
       // If deleted file was selected, clear selection
@@ -112,42 +101,27 @@ export default function LedgerManager() {
       await loadFiles();
     } catch (error) {
       toast({
-        title: "Error deleting file",
-        description: error instanceof Error ? error.message : "Failed to delete file",
-        variant: "destructive"
+        title: 'Error deleting file',
+        description: error instanceof Error ? error.message : 'Failed to delete file',
+        variant: 'destructive',
       });
     }
   };
 
   const setPrimaryFile = async (file: LedgerFile) => {
     try {
-      // First, unset all primary flags
-      const { error: unsetError } = await (supabase as any)
-        .from('ledger_files')
-        .update({ is_primary: false })
-        .neq('id', 0); // Update all rows
-
-      if (unsetError) throw unsetError;
-
-      // Then set the selected file as primary
-      const { error: setError } = await (supabase as any)
-        .from('ledger_files')
-        .update({ is_primary: true })
-        .eq('id', file.id);
-
-      if (setError) throw setError;
-
+      await ledgerService.setPrimaryFile(file.id);
       toast({
-        title: "Primary file updated",
-        description: `${file.name} is now the primary file`
+        title: 'Primary file updated',
+        description: `${file.name} is now the primary file`,
       });
 
       await loadFiles();
     } catch (error) {
       toast({
-        title: "Error setting primary file",
-        description: error instanceof Error ? error.message : "Failed to set primary file",
-        variant: "destructive"
+        title: 'Error setting primary file',
+        description: error instanceof Error ? error.message : 'Failed to set primary file',
+        variant: 'destructive',
       });
     }
   };
@@ -157,7 +131,7 @@ export default function LedgerManager() {
     setEditorContent(file.content);
   };
 
-  const primaryFiles = files.filter(f => f.is_primary);
+  const primaryFiles = files.filter((f) => f.is_primary);
   const hasMultiplePrimary = primaryFiles.length > 1;
 
   if (isLoading) {
@@ -171,18 +145,18 @@ export default function LedgerManager() {
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <Card className="w-80 rounded-none border-l-0 border-t-0 border-b-0">
+      <Card className="w-80 rounded-none border-b-0 border-l-0 border-t-0">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg">
             <FileText className="h-5 w-5" />
             Ledger Files
           </CardTitle>
           <Button onClick={() => setIsAddModalOpen(true)} className="w-full">
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Add New File
           </Button>
         </CardHeader>
-        
+
         <CardContent className="p-0">
           {hasMultiplePrimary && (
             <Alert className="mx-4 mb-4" variant="destructive">
@@ -197,21 +171,23 @@ export default function LedgerManager() {
             {files.map((file) => (
               <div
                 key={file.id}
-                className={`p-3 cursor-pointer border-b hover:bg-muted/50 transition-colors ${
+                className={`cursor-pointer border-b p-3 transition-colors hover:bg-muted/50 ${
                   selectedFile?.id === file.id ? 'bg-muted' : ''
                 }`}
                 onClick={() => selectFile(file)}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium text-sm truncate">{file.name}</span>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="truncate text-sm font-medium">{file.name}</span>
                   <div className="flex gap-1">
                     {file.is_primary && (
-                      <Badge variant="default" className="text-xs">Primary</Badge>
+                      <Badge variant="default" className="text-xs">
+                        Primary
+                      </Badge>
                     )}
                   </div>
                 </div>
-                
-                <div className="text-xs text-muted-foreground mb-2">
+
+                <div className="mb-2 text-xs text-muted-foreground">
                   Updated: {new Date(file.last_updated_at).toLocaleDateString()}
                 </div>
 
@@ -219,7 +195,7 @@ export default function LedgerManager() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="text-xs h-6"
+                    className="h-6 text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       setPrimaryFile(file);
@@ -231,7 +207,7 @@ export default function LedgerManager() {
                   <Button
                     size="sm"
                     variant="destructive"
-                    className="text-xs h-6"
+                    className="h-6 text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       deleteFile(file);
@@ -247,9 +223,9 @@ export default function LedgerManager() {
       </Card>
 
       {/* Main Editor Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-1 flex-col">
         {/* Editor Header */}
-        <div className="border-b bg-card p-4 flex items-center justify-between">
+        <div className="flex items-center justify-between border-b bg-card p-4">
           <div>
             {selectedFile ? (
               <div>
@@ -261,14 +237,16 @@ export default function LedgerManager() {
             ) : (
               <div>
                 <h2 className="text-lg font-semibold">No file selected</h2>
-                <p className="text-sm text-muted-foreground">Select a file from the sidebar to start editing</p>
+                <p className="text-sm text-muted-foreground">
+                  Select a file from the sidebar to start editing
+                </p>
               </div>
             )}
           </div>
 
           {selectedFile && (
             <Button onClick={saveFile} disabled={isSaving}>
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" />
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
           )}
@@ -277,10 +255,7 @@ export default function LedgerManager() {
         {/* Editor */}
         <div className="flex-1">
           {selectedFile ? (
-            <LedgerEditor
-              value={editorContent}
-              onChange={setEditorContent}
-            />
+            <LedgerEditor value={editorContent} onChange={setEditorContent} />
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground">
               Select a file to start editing

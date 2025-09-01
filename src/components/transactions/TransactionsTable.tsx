@@ -1,8 +1,7 @@
-import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { Badge } from '@/components/ui/badge';
-import { useTheme } from 'next-themes';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { AgGrid } from '@/components/ui/AgGrid';
 import type { Transaction, Posting } from '@/types/ledger';
 
 // Register AG Grid modules
@@ -57,10 +56,22 @@ const TagsRenderer = ({ value }: ICellRendererParams) => {
   );
 };
 
-export function TransactionsTable({ transactions }: TransactionsTableProps) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+// Comments cell renderer
+const CommentsRenderer = ({ value }: ICellRendererParams) => {
+  if (!value || value.length === 0) return <span className="text-muted-foreground">—</span>;
 
+  return (
+    <div className="space-y-1">
+      {value.map((comment: string, index: number) => (
+        <div key={index} className="text-xs text-muted-foreground">
+          {comment}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const columnDefs: ColDef[] = [
     {
       headerName: 'Date',
@@ -107,6 +118,14 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       cellRenderer: TagsRenderer,
       width: 150,
       autoHeight: true,
+      hide: true,
+    },
+    {
+      headerName: 'Comments',
+      field: 'comments',
+      cellRenderer: CommentsRenderer,
+      flex: 1,
+      autoHeight: true,
     },
   ];
 
@@ -117,39 +136,14 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
   };
 
   return (
-    <div
-      className="h-full w-full"
-      data-ag-theme-mode={isDark ? 'dark' : 'light'}
-      style={
-        {
-          '--ag-background-color': isDark ? 'hsl(var(--background))' : 'hsl(var(--background))',
-          '--ag-foreground-color': isDark ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))',
-          '--ag-header-background-color': isDark ? 'hsl(var(--card))' : 'hsl(var(--card))',
-          '--ag-header-foreground-color': isDark
-            ? 'hsl(var(--card-foreground))'
-            : 'hsl(var(--card-foreground))',
-          '--ag-border-color': isDark ? 'hsl(var(--border))' : 'hsl(var(--border))',
-          '--ag-row-hover-color': isDark ? 'hsl(var(--accent))' : 'hsl(var(--accent))',
-          '--ag-selected-row-background-color': isDark
-            ? 'hsl(var(--accent))'
-            : 'hsl(var(--accent))',
-          '--ag-font-family': 'inherit',
-          '--ag-font-size': '14px',
-          '--ag-grid-size': '6px',
-          '--ag-list-item-height': '40px',
-        } as React.CSSProperties
-      }
-    >
-      <AgGridReact
-        rowData={transactions}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        pagination={true}
-        paginationPageSize={50}
-        animateRows={true}
-        rowSelection="multiple"
-        suppressRowClickSelection={true}
-      />
-    </div>
+    <AgGrid
+      rowData={transactions}
+      columnDefs={columnDefs}
+      pagination={true}
+      paginationPageSize={50}
+      animateRows={true}
+      rowSelection="multiple"
+      suppressRowClickSelection={true}
+    />
   );
 }

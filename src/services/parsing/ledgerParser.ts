@@ -105,17 +105,49 @@ export function parseLedger(text: string, fileId: string): Transaction[] {
     if (!curHeader) return;
     if (curPostings.length === 0) return;
 
-    const amount = curPostings.reduce(
-      (sum, p) => sum + (Number.isFinite(p.amount) ? p.amount : 0),
-      0,
-    );
+    // Balance transaction if one posting has an elided amount.
+    // A posting with an elided amount is parsed as having amount=0 and currency=null.
+    const elidedPostings = curPostings.filter((p) => p.amount === 0 && p.currency === null);
+
+    if (elidedPostings.length === 1) {
+      const elidedPosting = elidedPostings[0];
+      const totalsByCurrency = new Map<string, number>();
+
+      // Sum amounts for each currency, excluding the elided one.
+      for (const p of curPostings) {
+        if (p !== elidedPosting) {
+          const currencyKey = p.currency || 'NULL_CURRENCY';
+          const currentTotal = totalsByCurrency.get(currencyKey) || 0;
+          totalsByCurrency.set(currencyKey, currentTotal + p.amount);
+        }
+      }
+
+      const originalElidedPostingIndex = curPostings.indexOf(elidedPosting);
+      if (originalElidedPostingIndex > -1) {
+        // Remove the placeholder elided posting.
+        curPostings.splice(originalElidedPostingIndex, 1);
+
+        // For each currency total, add a new posting with the inverse amount.
+        // This handles transactions with multiple currencies.
+        for (const [currencyKey, total] of totalsByCurrency.entries()) {
+          curPostings.splice(originalElidedPostingIndex, 0, {
+            account: elidedPosting.account,
+            amount: -total,
+            currency: currencyKey === 'NULL_CURRENCY' ? null : currencyKey,
+          });
+        }
+      }
+    }
+
+    // The canonical amount of a transaction is the sum of its positive postings (debits).
+    const amount = curPostings.filter((p) => p.amount > 0).reduce((sum, p) => sum + p.amount, 0);
 
     const tx: Transaction = {
       id: uuid(),
-      file_id: fileId,
+      file_id: Number(fileId),
       date: curHeader.date,
       narration: curHeader.narration,
-      payee: undefined,
+      payee: curHeader.narration,
       amount,
       tags: curHeader.tags,
       postings: curPostings,

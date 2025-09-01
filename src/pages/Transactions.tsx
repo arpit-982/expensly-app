@@ -6,7 +6,6 @@ import { ViewToggle } from '@/components/transactions/ViewToggle';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useFilter } from '@/contexts/FilterContext';
-import type { TransactionRow } from '@/data/sampleTransactions';
 import { useToast } from '@/hooks/use-toast';
 import { ledgerService } from '@/services/ledgerService';
 import type { Transaction, LedgerFile } from '@/types/ledger';
@@ -15,16 +14,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import type { FilterNode } from '@/types/filters';
+
+const countConditions = (node: FilterNode): number => {
+  // It's a condition
+  if ('field' in node) {
+    return 1;
+  }
+
+  // It's a group
+  if ('children' in node) {
+    return node.children.reduce((sum, child) => sum + countConditions(child), 0);
+  }
+
+  return 0;
+};
 
 const Transactions = () => {
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [ledgerFiles, setLedgerFiles] = useState<LedgerFile[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState<string>('');
+  const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { formatCurrency } = useCurrency();
-  const { filterConfig, hasActiveFilters } = useFilter();
+  const { filter: filterConfig, hasActiveFilters } = useFilter();
 
   useEffect(() => {
     fetchLedgerFiles();
@@ -32,7 +46,7 @@ const Transactions = () => {
 
   useEffect(() => {
     if (selectedFileId) {
-      parseSelectedFile();
+      fetchTransactions();
     }
   }, [selectedFileId]);
 
@@ -43,15 +57,17 @@ const Transactions = () => {
 
       // Auto-select primary file or first file
       const primaryFile = files.find((f) => f.is_primary);
-      const defaultFile = primaryFile || files[0];
-      if (defaultFile) {
-        setSelectedFileId(defaultFile.id);
+      if (primaryFile) {
+        setSelectedFileId(primaryFile.id);
+      } else if (files.length > 0) {
+        setSelectedFileId(files[0].id);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
       console.error('Error fetching ledger files:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to fetch ledger files',
+        title: 'Error Fetching Files',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -59,57 +75,23 @@ const Transactions = () => {
     }
   };
 
-  const parseSelectedFile = async () => {
-    const selectedFile = ledgerFiles.find((f) => f.id === selectedFileId);
-    if (!selectedFile) return;
+  const fetchTransactions = async () => {
+    if (!selectedFileId) return;
 
     try {
-      await ledgerService.parseAndUpsert(selectedFile.id);
-      const data = await ledgerService.listTransactions(selectedFile.id);
+      const data = await ledgerService.listTransactions(selectedFileId);
       // Sort by date descending (newest first)
       data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setTransactions(data);
-
-      toast({
-        title: 'Success',
-        description: `Parsed ${data.length} transactions`,
-      });
     } catch (error) {
-      console.error('Error parsing transactions:', error);
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+      console.error('Error fetching transactions:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to parse transactions',
+        title: 'Error Fetching Transactions',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
-  };
-
-  // Transform parsed transactions to table format
-  const transformToTableData = (transactions: Transaction[]): TransactionRow[] => {
-    return transactions.map((transaction, index) => {
-      const debitAccounts: string[] = [];
-      const creditAccounts: string[] = [];
-      let amount = 0;
-
-      transaction.postings.forEach((posting) => {
-        if (posting.amount > 0) {
-          debitAccounts.push(posting.account);
-          amount = posting.amount;
-        } else {
-          creditAccounts.push(posting.account);
-        }
-      });
-
-      return {
-        id: `${transaction.date}-${index}`,
-        date: transaction.date,
-        narration: transaction.payee,
-        debitAccounts,
-        creditAccounts,
-        amount,
-        tags: [], // Will be populated later when we add tagging functionality
-      };
-    });
   };
 
   const formatAmount = (amount: number, currency: string | null) => {
@@ -138,11 +120,8 @@ const Transactions = () => {
     );
   }
 
-  const tableData = transformToTableData(transactions);
-
   // Apply filters to transactions
   const filteredTransactions = filterTransactions(transactions, filterConfig);
-  const filteredTableData = transformToTableData(filteredTransactions);
 
   return (
     <div className="space-y-6 p-6">
@@ -176,10 +155,7 @@ const Transactions = () => {
                 Filters
                 {hasActiveFilters && (
                   <Badge variant="secondary" className="ml-2 text-xs">
-                    {filterConfig.groups.reduce(
-                      (total, group) => total + group.conditions.length,
-                      0,
-                    )}
+                    {countConditions(filterConfig)}
                   </Badge>
                 )}
               </Button>
@@ -194,14 +170,24 @@ const Transactions = () => {
       </div>
 
       {/* Content */}
-      {transactions.length === 0 && !loading ? (
+      {ledgerFiles.length === 0 && !loading ? (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-semibold">No Ledger Files Found</h3>
+              <p className="text-muted-foreground">Please add a ledger file to get started.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : transactions.length === 0 && !loading ? (
         <Card>
           <CardContent className="flex items-center justify-center py-12">
             <div className="text-center">
               <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
               <h3 className="mb-2 text-lg font-semibold">No Transactions Found</h3>
               <p className="text-muted-foreground">
-                No ledger files found or selected file doesn't contain valid transactions.
+                The selected ledger file does not contain any valid transactions.
               </p>
             </div>
           </CardContent>
@@ -209,7 +195,7 @@ const Transactions = () => {
       ) : (
         <div className="h-[calc(100vh-200px)]">
           {viewMode === 'table' ? (
-            <TransactionsTable transactions={filteredTableData} />
+            <TransactionsTable transactions={filteredTransactions} />
           ) : (
             <div className="h-full space-y-4 overflow-auto">
               {filteredTransactions.map((transaction, index) => (
@@ -224,16 +210,6 @@ const Transactions = () => {
                       </div>
                       <Badge variant="outline">{transaction.date}</Badge>
                     </div>
-
-                    {transaction.comments.length > 0 && (
-                      <div className="mt-2">
-                        {transaction.comments.map((comment, commentIndex) => (
-                          <p key={commentIndex} className="text-sm italic text-muted-foreground">
-                            {comment}
-                          </p>
-                        ))}
-                      </div>
-                    )}
                   </CardHeader>
 
                   <CardContent>

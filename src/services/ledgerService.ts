@@ -3,20 +3,25 @@
 // Hides Supabase details behind a small repository layer.
 
 import type { LedgerFile, Transaction, LedgerService } from '@/types/ledger';
+import { StagedTransaction } from '@/types/autotag';
 import {
   selectFiles,
   updateFileContent,
+  deleteFile as deleteFileRepo,
+  setPrimaryFile as setPrimaryFileRepo,
   selectTransactions,
   upsertTransactions,
 } from '@/integrations/supabase/ledger.repo';
 import { parseLedger } from '@/services/parsing/ledgerParser';
+import { Transaction as LedgerTransaction } from '@/types/ledger';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Parse raw ledger text into structured transactions.
  * Kept as a separate function so we can swap the implementation later (worker/CLI).
  */
-async function parseLedgerTextToTransactions(text: string, fileId: string): Promise<Transaction[]> {
-  return parseLedger(text, fileId);
+async function parseLedgerTextToTransactions(text: string, fileId: number): Promise<Transaction[]> {
+  return parseLedger(text, fileId.toString());
 }
 
 export const ledgerService: LedgerService = {
@@ -28,7 +33,15 @@ export const ledgerService: LedgerService = {
     await updateFileContent(file);
   },
 
-  async parseAndUpsert(fileId) {
+  async deleteFile(fileId: number) {
+    await deleteFileRepo(fileId);
+  },
+
+  async setPrimaryFile(fileId: number) {
+    await setPrimaryFileRepo(fileId);
+  },
+
+  async parseAndUpsert(fileId: number) {
     // Load the current file content
     const files = await selectFiles();
     const file = files.find((f) => f.id === fileId);
@@ -44,7 +57,23 @@ export const ledgerService: LedgerService = {
     await upsertTransactions(fileId, prepared);
   },
 
-  async listTransactions(fileId) {
+  async listTransactions(fileId: number) {
     return selectTransactions(fileId);
   },
+
+  async addTransactions(transactions: StagedTransaction[], fileId: number) {
+    const prepared: LedgerTransaction[] = transactions.map((t) => ({
+      id: uuidv4(),
+      file_id: fileId,
+      date: t.date,
+      narration: t.description,
+      amount: t.amount,
+      tags: [],
+      postings: [
+        { account: t.account, amount: t.amount },
+        { account: t.suggestedAccount, amount: -t.amount },
+      ],
+    }));
+    await upsertTransactions(fileId, prepared);
+  }
 };

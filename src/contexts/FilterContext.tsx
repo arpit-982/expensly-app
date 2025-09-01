@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { FilterGroup, FilterCondition, FilterNode, FilterField } from '@/types/filters';
+import { FilterGroup, FilterNode, FilterField } from '@/types/filters';
 import { createFilterGroup, createFilterCondition } from '@/lib/filterEngine';
 
 // --- Recursive Helper Functions for Immutable Updates ---
@@ -18,10 +18,10 @@ function updateNodeRecursive(
   }
 
   if ('children' in currentNode) {
-    return {
-      ...currentNode,
-      children: currentNode.children.map((child) => updateNodeRecursive(child, nodeId, updateFn)),
-    };
+    const newChildren = currentNode.children.map((child) =>
+      updateNodeRecursive(child, nodeId, updateFn),
+    );
+    return { ...currentNode, children: newChildren };
   }
 
   return currentNode;
@@ -117,15 +117,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   }, []);
   const updateNode = useCallback((nodeId: string, updates: Partial<FilterNode>) => {
     const updater = (node: FilterNode): FilterNode => {
-      // Use a type guard to handle groups and conditions separately.
-      if ('children' in node) {
-        // This is a FilterGroup.
-        return { ...node, ...updates };
-      } else {
-        // This is a FilterCondition. We assert the type because we know from our UI
-        // logic that we are not changing the `field` here, only `operator` or `value`.
-        return { ...node, ...updates } as FilterCondition;
-      }
+      return { ...node, ...updates } as FilterNode;
     };
     setFilter(
       (currentFilter) => updateNodeRecursive(currentFilter, nodeId, updater) as FilterGroup,
