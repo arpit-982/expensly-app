@@ -1,6 +1,6 @@
 import { AutoTagInput, AutoTagSuggestion } from '../../types/autotag.js';
 import { AutoTagProvider } from '../autoTagService.js';
-import { config } from '../../config.cli.js';
+import { config } from '../../config.js';
 import { JSON_PROMPT, validateSuggestions } from './prompts.js';
 
 // This is a placeholder implementation.

@@ -1,4 +1,4 @@
-import { config } from '../config.cli.js';
+import { config } from '../config.js';
 import { generateFingerprint } from '../lib/fingerprint.js';
 import { AutoTagInput, AutoTagSuggestion, TxnAutoTagMeta } from '../types/autotag.js';
 import { GeminiProvider } from './llm/geminiProvider.js';

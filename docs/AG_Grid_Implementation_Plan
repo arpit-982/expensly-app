@@ -1,0 +1,121 @@
+# Expensly — AG Grid Standardization Plan (Agent Playbook)
+
+## Purpose
+Make AG Grid **easy, consistent, and fast** to use across the app so any agent can add or modify tables with minimal effort and zero drift in UX/behavior.
+
+---
+
+## Context & Non-Negotiables
+- **AG Grid is the standard for tabular data** across the UI. Keep styling in line with Mantine + Tailwind conventions. [oai_citation:0‡02_Development_Context.md.md](file-service://file-QE9NfBdFENXkCAt4hZxomW)
+- **UI never talks to Supabase directly**; all data access is via the service layer (`ledgerService`). [oai_citation:1‡02_Development_Context.md.md](file-service://file-QE9NfBdFENXkCAt4hZxomW) [oai_citation:2‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- **Debit/Credit** must be **derived from posting sign** at render-time; do not maintain duplicate debit/credit arrays in models. [oai_citation:3‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+
+---
+
+## Outcomes (Definition of Done)
+- Agents can render a production-ready table by supplying **data, columns, and a row key**—no raw AG Grid config required.
+- All tables share the **same loading/empty/error** states, **pagination**, **selection**, and **filter** behavior.
+- **Column formatting** (dates, currency, tags, narration) is uniform and type-safe.
+- **Filters** (date, amount, narration, tags, account) are centralized—no one-off filter logic in components. [oai_citation:4‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- No components import `ag-grid-react` directly; guarded by lint rules. [oai_citation:5‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+
+---
+
+## Deliverables (What we ship)
+1. **Data Grid Wrapper**
+   - Single component that encapsulates grid options, overlays, selection, pagination, and row id normalization.
+   - Accepts either local `data` (client-mode) or a `serverSide` query contract (page/sort/filter → rows/total).
+
+2. **Column Helper Library**
+   - Declarative builders for common types: text, money, date, enum/badge, actions.
+   - All money/date formatting is centralized and locale/currency aware.
+
+3. **Shared Cell Renderers**
+   - Currency (sign-aware, color-coded), date, tags/badges, and a standard row-actions block.
+
+4. **Hooks**
+   - `useGridData` for server-side fetching (maps grid events → query object).
+   - `useGridSelection` for consistent selection state and row ids.
+   - Optional `useColumnFactory` to pull shared formatters/renderers.
+
+5. **Styling**
+   - One AG Grid theme (Quartz) app-wide; Tailwind utilities for radius, borders, shadows. [oai_citation:6‡02_Development_Context.md.md](file-service://file-QE9NfBdFENXkCAt4hZxomW)
+
+6. **Recipes & Docs**
+   - Storybook pages for: basic client, server-side mode, selection + bulk actions, inline editing, column visibility persistence, and master-detail.
+
+7. **Guardrails**
+   - ESLint rule: forbid direct AG Grid imports outside the wrapper.
+   - VS Code snippet (`dg:scaffold`) to bootstrap a new grid.
+   - Codemod to migrate legacy tables to the wrapper.
+
+---
+
+## Usage Contract (Agent-Facing)
+- **Inputs:** `columns`, `rowKey`, and either `data` (client) or `serverSide` `onQuery` handler (returns `{ rows, total }`).
+- **Behavior baked in:** default column defs (sortable/filterable/resizable), loading & error overlays, pagination on by default, optional selection (`none/single/multi`).
+- **Events:** `onRowClick` supported; advanced events remain behind the wrapper to prevent API sprawl.
+- **Filtering:** use centralized filter engine for advanced filters; avoid ad-hoc grid filters where possible. [oai_citation:7‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+
+---
+
+## Data & Service Expectations
+- **Services only:** UI calls `ledgerService.listTransactions(fileId)` (and peers), never Supabase APIs directly. [oai_citation:8‡02_Development_Context.md.md](file-service://file-QE9NfBdFENXkCAt4hZxomW) [oai_citation:9‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- **Structured data:** transactions include `postings[]`; UI derives debit/credit from sign at render time. [oai_citation:10‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- **Filters** apply to `date`, `amount`, `narration`, `tags`, and `account` names (via postings). [oai_citation:11‡02_Development_Context.md.md](file-service://file-QE9NfBdFENXkCAt4hZxomW)
+
+---
+
+## Migration Plan (3 Sprints)
+
+### Sprint 1 — Foundation (Enablement)
+- Build the wrapper, column helpers, renderers, and hooks.
+- Apply the Quartz theme globally; add Tailwind utility classes.
+- Add ESLint rule and codemod to block/migrate direct AG Grid usage.
+- Publish Storybook recipes and a Quickstart.
+
+### Sprint 2 — Convergence (Prove It)
+- Migrate 2–3 representative screens (client data, server-side data, inline editing).
+- Wire shared currency/date/tag renderers.
+- Add tests (unit for helpers/services; component tests for wrapper recipes).
+
+### Sprint 3 — Rollout (Adopt Everywhere)
+- Run the codemod and migrate remaining grids.
+- Ship VS Code scaffold snippet.
+- Host a 30-minute enablement session; collect feedback and iterate.
+
+---
+
+## Acceptance Criteria
+- **No raw AG Grid imports** in the repo (lint enforced).
+- **One set of defaults** (sorting/filtering/resizing) via wrapper; no overrides in screens.
+- **Debit/Credit derived from sign** uniformly in all tables. [oai_citation:12‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- **Filters centralized**; no per-screen filter implementations. [oai_citation:13‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- **Services only** for data access; no Supabase calls in components. [oai_citation:14‡02_Development_Context.md.md](file-service://file-QE9NfBdFENXkCAt4hZxomW) [oai_citation:15‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- Storybook recipes compile and demonstrate all target scenarios.
+
+---
+
+## Risks & Mitigations
+- **Learning curve / drift:** mitigate with wrapper + recipes + lint rules. [oai_citation:16‡01_PRD_and_Architecture.md](file-service://file-AB1Vu35y17bouQkMm5u17u)
+- **Inconsistent data models:** rely on unified ledger types and service layer to standardize shape. [oai_citation:17‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- **Performance on large files:** server-side pagination/sort/filter in the wrapper’s contract; avoid heavy client transforms. [oai_citation:18‡01_PRD_and_Architecture.md](file-service://file-AB1Vu35y17bouQkMm5u17u)
+
+---
+
+## Checklist (Agent Runbook)
+- [ ] Import the **Data Grid Wrapper** from the designated package path.
+- [ ] Define columns using **column helpers** (text/money/date/enum/badge).
+- [ ] Provide a **stable `rowKey`** (field name or function).
+- [ ] Choose **client** (`data`) or **server-side** (`onQuery`) mode.
+- [ ] Use **shared renderers** for currency/date/tags; avoid custom one-offs.
+- [ ] Add filters through the **central filter engine** (not inline hacks). [oai_citation:19‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- [ ] Do **not** import AG Grid directly; lint should pass cleanly.
+- [ ] Add a **Storybook example** if this usage pattern is new.
+
+---
+
+## Documentation Anchors
+- Development conventions (AG Grid, UI rules, folder layout). [oai_citation:20‡02_Development_Context.md.md](file-service://file-QE9NfBdFENXkCAt4hZxomW)
+- Refactor targets: types unification, service layer, filter centralization, debit/credit derivation. [oai_citation:21‡04_Codebase_Refactor_Plan.md](file-service://file-FEVuhNEFZnwMrrM4K424EX)
+- Product goals and performance expectations (reinforce UX/perf constraints). [oai_citation:22‡01_PRD_and_Architecture.md](file-service://file-AB1Vu35y17bouQkMm5u17u)

@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* AG Grid CSS imports (placed after Tailwind to avoid Preflight overrides) */
+@import 'ag-grid-community/styles/ag-grid.css';
+@import 'ag-grid-community/styles/ag-theme-quartz.css';
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
@@ -95,11 +99,149 @@ All colors MUST be HSL.
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* AG Grid Quartz — dark-mode overrides
+   Some AG Grid themes may not include a dedicated dark CSS file.
+   These overrides ensure the quartz wrapper looks correct in dark mode
+   using the app's CSS variables (defined above). */
+.ag-theme-quartz-dark .ag-root,
+.ag-theme-quartz-dark .ag-root-wrapper {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Header styling */
+.ag-theme-quartz-dark .ag-header,
+.ag-theme-quartz-dark .ag-header-cell,
+.ag-theme-quartz-dark .ag-header-viewport {
+  background-color: hsl(var(--sidebar-background)) !important;
+  color: hsl(var(--sidebar-foreground)) !important;
+  border-bottom: 1px solid hsl(var(--sidebar-border)) !important;
+}
+
+/* Rows and cells */
+.ag-theme-quartz-dark .ag-row {
+  background-color: transparent !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.ag-theme-quartz-dark .ag-row-hover,
+.ag-theme-quartz-dark .ag-row-selected {
+  background-color: rgba(255,255,255,0.03) !important;
+}
+
+/* Cell separators — subtle in dark mode */
+.ag-theme-quartz-dark .ag-cell {
+  border-right: 1px solid rgba(255,255,255,0.04) !important;
+}
+
+/* Pagination bar, status bar, and controls */
+.ag-theme-quartz-dark .ag-paging-panel,
+.ag-theme-quartz-dark .ag-status-bar,
+.ag-theme-quartz-dark .ag-paging-description,
+.ag-theme-quartz-dark .ag-pagination-panel {
+  background-color: hsl(var(--sidebar-background)) !important;
+  color: hsl(var(--sidebar-foreground)) !important;
+  border-top: 1px solid hsl(var(--sidebar-border)) !important;
+}
+
+/* Paging buttons and icons */
+.ag-theme-quartz-dark .ag-paging-button,
+.ag-theme-quartz-dark .ag-icon,
+.ag-theme-quartz-dark .ag-pager-icon {
+  color: hsl(var(--sidebar-foreground)) !important;
+  opacity: 0.95;
+}
+
+/* Ensure body viewport (where rows render) uses transparent backgrounds */
+.ag-theme-quartz-dark .ag-body-viewport,
+.ag-theme-quartz-dark .ag-center-cols-viewport,
+.ag-theme-quartz-dark .ag-body {
+  background-color: transparent !important;
+}
+
+/* Reduce any grid-level shadows in dark theme */
+.ag-theme-quartz-dark .ag-root-wrapper {
+  box-shadow: none !important;
+}
+
+/* Fallback: if the wrapper is marked via our data attribute */
+[data-grid-theme="dark"] .ag-root,
+[data-grid-theme="dark"] .ag-root-wrapper {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Extra: if Tailwind's preflight still interferes, increase specificity */
+.ag-theme-quartz-dark .ag-root .ag-body .ag-row .ag-cell,
+[data-grid-theme="dark"] .ag-root .ag-body .ag-row .ag-cell {
+  background-color: transparent !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Additional dark-mode fixes for AG Grid controls (pagination, status bar, borders) */
+.ag-theme-quartz-dark .ag-paging-panel,
+.ag-theme-quartz-dark .ag-status-bar,
+.ag-theme-quartz-dark .ag-pagination,
+.ag-theme-quartz-dark .ag-pagination-panel,
+.ag-theme-quartz-dark .ag-paging-description,
+.ag-theme-quartz-dark .ag-pager-icon,
+.ag-theme-quartz-dark .ag-paging-button {
+  background-color: hsl(var(--sidebar-background)) !important;
+  color: hsl(var(--sidebar-foreground)) !important;
+  border-top: 1px solid hsl(var(--sidebar-border)) !important;
+}
+
+/* Pagination buttons */
+.ag-theme-quartz-dark .ag-paging-button,
+.ag-theme-quartz-dark .ag-paging-button:disabled,
+.ag-theme-quartz-dark .ag-paging-button:hover {
+  background: transparent !important;
+  color: hsl(var(--sidebar-foreground)) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Status bar items */
+.ag-theme-quartz-dark .ag-status-bar .ag-status-name,
+.ag-theme-quartz-dark .ag-status-bar .ag-status-value {
+  color: hsl(var(--sidebar-foreground)) !important;
+}
+
+/* Ensure pagination controls (icons, selects) use the dark foreground */
+.ag-theme-quartz-dark .ag-icon,
+.ag-theme-quartz-dark .ag-select,
+.ag-theme-quartz-dark .ag-pagination-panel .ag-input {
+  color: hsl(var(--sidebar-foreground)) !important;
+}
+
+/* Subtle borders for dark mode (avoid overly heavy lines) */
+.ag-theme-quartz-dark .ag-root,
+.ag-theme-quartz-dark .ag-root-wrapper,
+.ag-theme-quartz-dark .ag-header,
+.ag-theme-quartz-dark .ag-header-cell,
+.ag-theme-quartz-dark .ag-cell {
+  border-color: rgba(255,255,255,0.04) !important;
+}
+
+/* Make sure header tool panels / filters also inherit dark colors */
+.ag-theme-quartz-dark .ag-header-cell .ag-floating-filter-body,
+.ag-theme-quartz-dark .ag-header-filter {
+  background: transparent !important;
+  color: hsl(var(--sidebar-foreground)) !important;
+}
+
+/* Fallback via our data attribute to cover instances where the theme class isn't applied */
+[data-grid-theme="dark"] .ag-paging-panel,
+[data-grid-theme="dark"] .ag-status-bar,
+[data-grid-theme="dark"] .ag-pagination,
+[data-grid-theme="dark"] .ag-root,
+[data-grid-theme="dark"] .ag-root-wrapper {
+  background-color: hsl(var(--sidebar-background)) !important;
+  color: hsl(var(--sidebar-foreground)) !important;
+  border-color: rgba(255,255,255,0.04) !important;
 }

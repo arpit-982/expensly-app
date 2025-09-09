@@ -1,5 +1,5 @@
 import React from 'react';
-import { AgGrid } from '@/components/ui/AgGrid';
+import { AgGrid } from '@/components/ag-grid/AgGrid';
 import { StagedTransaction } from '@/types/autotag';
 
 interface ReviewTableProps {

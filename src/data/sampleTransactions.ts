@@ -1,85 +1,117 @@
-export interface TransactionRow {
-  id: string;
-  date: string;
-  narration: string;
-  debitAccounts: string[];
-  creditAccounts: string[];
-  amount: number;
-  tags: string[];
-  comments?: string[];
-}
+// Sample transactions using the new schema with postings
+import type { Transaction } from '@/types/ledger';
 
-export const sampleTransactions: TransactionRow[] = [
+export const sampleTransactions: Transaction[] = [
   {
-    id: '1',
+    id: '550e8400-e29b-41d4-a716-446655440001',
+    file_id: 1,
     date: '2025-01-15',
     narration: 'Coffee at Starbucks',
-    debitAccounts: ['Expenses:Food:Coffee'],
-    creditAccounts: ['Assets:Checking'],
+    payee: 'Starbucks',
     amount: 5.5,
     tags: ['work', 'coffee'],
+    postings: [
+      { account: 'Expenses:Food:Coffee', amount: 5.5, currency: 'USD' },
+      { account: 'Assets:Checking', amount: -5.5, currency: 'USD' },
+    ],
+    comments: [],
   },
   {
-    id: '2',
+    id: '550e8400-e29b-41d4-a716-446655440002',
+    file_id: 1,
     date: '2025-01-14',
     narration: 'Salary Payment',
-    debitAccounts: ['Assets:Checking'],
-    creditAccounts: ['Income:Salary'],
-    amount: -3500.0,
+    payee: 'Employer Inc',
+    amount: 3500.0,
     tags: ['salary', 'monthly'],
+    postings: [
+      { account: 'Assets:Checking', amount: 3500.0, currency: 'USD' },
+      { account: 'Income:Salary', amount: -3500.0, currency: 'USD' },
+    ],
+    comments: [],
   },
   {
-    id: '3',
+    id: '550e8400-e29b-41d4-a716-446655440003',
+    file_id: 1,
     date: '2025-01-13',
     narration: 'Gas Station Fill-up',
-    debitAccounts: ['Expenses:Transportation:Gas'],
-    creditAccounts: ['Assets:Credit Card'],
+    payee: 'Shell Gas Station',
     amount: 45.3,
     tags: ['transportation', 'gas'],
+    postings: [
+      { account: 'Expenses:Transportation:Gas', amount: 45.3, currency: 'USD' },
+      { account: 'Assets:Credit Card', amount: -45.3, currency: 'USD' },
+    ],
+    comments: [],
   },
   {
-    id: '4',
+    id: '550e8400-e29b-41d4-a716-446655440004',
+    file_id: 1,
     date: '2025-01-12',
     narration: 'Grocery Shopping',
-    debitAccounts: ['Expenses:Food:Groceries'],
-    creditAccounts: ['Assets:Checking'],
+    payee: 'Whole Foods',
     amount: 127.83,
     tags: ['food', 'groceries'],
+    postings: [
+      { account: 'Expenses:Food:Groceries', amount: 127.83, currency: 'USD' },
+      { account: 'Assets:Checking', amount: -127.83, currency: 'USD' },
+    ],
+    comments: [],
   },
   {
-    id: '5',
+    id: '550e8400-e29b-41d4-a716-446655440005',
+    file_id: 1,
     date: '2025-01-11',
     narration: 'Internet Bill',
-    debitAccounts: ['Expenses:Utilities:Internet'],
-    creditAccounts: ['Assets:Checking'],
+    payee: 'Comcast',
     amount: 79.99,
     tags: ['utilities', 'monthly'],
+    postings: [
+      { account: 'Expenses:Utilities:Internet', amount: 79.99, currency: 'USD' },
+      { account: 'Assets:Checking', amount: -79.99, currency: 'USD' },
+    ],
+    comments: [],
   },
   {
-    id: '6',
+    id: '550e8400-e29b-41d4-a716-446655440006',
+    file_id: 1,
     date: '2025-01-10',
     narration: 'Restaurant Dinner',
-    debitAccounts: ['Expenses:Food:Restaurants'],
-    creditAccounts: ['Assets:Credit Card'],
+    payee: 'Italian Bistro',
     amount: 67.45,
     tags: ['food', 'dining'],
+    postings: [
+      { account: 'Expenses:Food:Restaurants', amount: 67.45, currency: 'USD' },
+      { account: 'Assets:Credit Card', amount: -67.45, currency: 'USD' },
+    ],
+    comments: [],
   },
   {
-    id: '7',
+    id: '550e8400-e29b-41d4-a716-446655440007',
+    file_id: 1,
     date: '2025-01-09',
     narration: 'Amazon Purchase',
-    debitAccounts: ['Expenses:Shopping:Online'],
-    creditAccounts: ['Assets:Credit Card'],
+    payee: 'Amazon',
     amount: 29.99,
     tags: ['shopping', 'online'],
+    postings: [
+      { account: 'Expenses:Shopping:Online', amount: 29.99, currency: 'USD' },
+      { account: 'Assets:Credit Card', amount: -29.99, currency: 'USD' },
+    ],
+    comments: [],
   },
   {
-    id: '8',
+    id: '550e8400-e29b-41d4-a716-446655440008',
+    file_id: 1,
     date: '2025-01-08',
     narration: 'ATM Withdrawal',
-    debitAccounts: ['Assets:Cash'],
-    creditAccounts: ['Assets:Checking'],
+    payee: 'Bank ATM',
     amount: 100.0,
     tags: ['cash', 'withdrawal'],
+    postings: [
+      { account: 'Assets:Cash', amount: 100.0, currency: 'USD' },
+      { account: 'Assets:Checking', amount: -100.0, currency: 'USD' },
+    ],
+    comments: [],
   },
 ];

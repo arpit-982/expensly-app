@@ -1,11 +1,8 @@
-import { ColDef, ICellRendererParams, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { AgGrid } from '@/components/ui/AgGrid';
+import { AgGrid } from '@/components/ag-grid/AgGrid';
 import type { Transaction, Posting } from '@/types/ledger';
-
-// Register AG Grid modules
-ModuleRegistry.registerModules([AllCommunityModule]);
 
 interface TransactionsTableProps {
   transactions: Transaction[];
@@ -142,8 +139,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       pagination={true}
       paginationPageSize={50}
       animateRows={true}
-      rowSelection="multiple"
-      suppressRowClickSelection={true}
+      rowSelection={{ mode: 'multiRow', enableClickSelection: false }}
     />
   );
 }
